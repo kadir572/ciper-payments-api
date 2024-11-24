@@ -54,7 +54,7 @@ func createPaymentIntent(amount int64, currency string) (*SuccessResponse, *Erro
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(amount),
 		Currency: stripe.String(currency),
-		PaymentMethodTypes: []*string{stripe.String("card"), stripe.String("twint")},
+		PaymentMethodTypes: []*string{stripe.String("card")},
 	}
 
 	pi, err := paymentintent.New(params)
