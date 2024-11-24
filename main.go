@@ -1,31 +1,31 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go"
 	"github.com/stripe/stripe-go/paymentintent"
 )
 
-// SuccessResponse will be returned with the client secret
+// SuccessResponse represents the successful response with the client secret
 type SuccessResponse struct {
 	ClientSecret string `json:"clientSecret"`
 }
 
-// ErrorResponse will be used in case of errors
+// ErrorResponse represents the error response
 type ErrorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// PaymentRequest is the structure for the incoming request body
+// PaymentRequest represents the structure for incoming payment request
 type PaymentRequest struct {
 	Amount   int64  `json:"amount"`   // amount in smallest currency unit (e.g., cents)
-	Currency string `json:"currency"` // currency in 3-letter ISO currency code (e.g., "usd")
+	Currency string `json:"currency"` // currency in 3-letter ISO code (e.g., "usd")
 }
 
 // getStripeSecretKey retrieves the Stripe secret key from environment variables
@@ -37,9 +37,9 @@ func getStripeSecretKey() (string, error) {
 	return stripeSecretKey, nil
 }
 
-// createPaymentIntent interacts with Stripe's API to create a payment intent
+// createPaymentIntent interacts with Stripe API to create a payment intent
 func createPaymentIntent(amount int64, currency string) (*SuccessResponse, *ErrorResponse) {
-	// First, retrieve the Stripe secret key
+	// Retrieve the Stripe secret key
 	stripeSecretKey, err := getStripeSecretKey()
 	if err != nil {
 		return nil, &ErrorResponse{
@@ -72,49 +72,51 @@ func createPaymentIntent(amount int64, currency string) (*SuccessResponse, *Erro
 		}
 	}
 
-	// Return the client secret in a successful response
+	// Return the client secret in the successful response
 	return &SuccessResponse{ClientSecret: pi.ClientSecret}, nil
 }
 
-// stripePaymentHandler is the handler that will be called when a payment intent is requested
-func stripePaymentHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse the request body to get the payment data
-	var paymentRequest PaymentRequest
-	if err := json.NewDecoder(r.Body).Decode(&paymentRequest); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Call createPaymentIntent to get the client secret
-	successResp, errorResp := createPaymentIntent(paymentRequest.Amount, paymentRequest.Currency)
-
-	// Handle errors
-	if errorResp != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(errorResp)
-		return
-	}
-
-	// Return the success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(successResp)
-}
-
 func main() {
-	// Set up the API route for handling the payment request
-	http.HandleFunc("/create-payment-intent", stripePaymentHandler)
+	r := gin.Default()
 
-	// Use the PORT environment variable or fallback to port 8080 for local development
+	// Root GET endpoint to confirm the server is running
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Server is up and running!",
+		})
+	})
+
+	// POST /create-payment-intent to create a payment intent
+	r.POST("/create-payment-intent", func(c *gin.Context) {
+		var paymentRequest PaymentRequest
+
+		// Bind JSON request to paymentRequest struct
+		if err := c.ShouldBindJSON(&paymentRequest); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// Create the payment intent
+		successResp, errorResp := createPaymentIntent(paymentRequest.Amount, paymentRequest.Currency)
+
+		// Handle errors
+		if errorResp != nil {
+			c.JSON(http.StatusInternalServerError, errorResp)
+			return
+		}
+
+		// Return the success response
+		c.JSON(http.StatusOK, successResp)
+	})
+
+	// Use the PORT environment variable or fallback to port 8080
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
 	log.Printf("Server is starting on port %s...", port)
-
-	// Start the server
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
