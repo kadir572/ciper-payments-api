@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"fmt"
@@ -76,7 +76,7 @@ func createPaymentIntent(amount int64, currency string) (*SuccessResponse, *Erro
 	return &SuccessResponse{ClientSecret: pi.ClientSecret}, nil
 }
 
-func main() {
+func Handler() {
 	r := gin.Default()
 
 	// Root GET endpoint to confirm the server is running
