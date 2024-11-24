@@ -1,8 +1,7 @@
-package handler
+package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -76,18 +75,20 @@ func createPaymentIntent(amount int64, currency string) (*SuccessResponse, *Erro
 	return &SuccessResponse{ClientSecret: pi.ClientSecret}, nil
 }
 
-func Handler() {
-	r := gin.Default()
+// Handler is the Vercel serverless function that will handle the incoming requests
+func Handler(w http.ResponseWriter, r *http.Request) {
+	// Use Gin to handle the routes
+	router := gin.Default()
 
 	// Root GET endpoint to confirm the server is running
-	r.GET("/", func(c *gin.Context) {
+	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Server is up and running!",
 		})
 	})
 
 	// POST /create-payment-intent to create a payment intent
-	r.POST("/create-payment-intent", func(c *gin.Context) {
+	router.POST("/create-payment-intent", func(c *gin.Context) {
 		var paymentRequest PaymentRequest
 
 		// Bind JSON request to paymentRequest struct
@@ -109,14 +110,7 @@ func Handler() {
 		c.JSON(http.StatusOK, successResp)
 	})
 
-	// Use the PORT environment variable or fallback to port 8080
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Server is starting on port %s...", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	// Call the Gin router to handle the HTTP request
+	router.ServeHTTP(w, r)
 }
+
